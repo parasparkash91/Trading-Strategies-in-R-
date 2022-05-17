@@ -1,0 +1,197 @@
+---
+output:
+  pdf_document: 
+    toc: yes
+    fig_width: 20
+    fig_height: 13
+    fig_caption: yes
+    number_sections: yes
+    keep_tex: yes
+  html_document: 
+    toc: yes
+    fig_width: 20
+    fig_height: 13
+    fig_caption: yes
+    number_sections: yes
+    df_print: default
+  word_document: default
+---
+Introduction to backtesting in 
+
+->[Purpose - Make reader aware about different function available in R langauge that can be easily used for backtesting purpose]
+->[This file is generated using RMarkup Knitting, so kindly ignore non standard formating]
+
+In this article, I’ll be explaining use of different libraries in R to formulate a simple strategy and measure its performace. In this article I will be using the following packages: 
+1.quantmod --> For getting Data and Charting purpose 
+2.xts --> For generating simple time series class objects
+3.PerformanceAnalytics --> For computing indicators and other performance indicators
+
+
+```{r}
+#Calling all the libraries
+library(quantmod)
+library(PerformanceAnalytics)
+library(xts)
+library(dygraphs)
+library(PerformanceAnalytics)
+```
+[1] Reading financial data 
+-> This is the most important step. We will be using the getSymbols function of quantmod library. There are different sources that we can use. By default, its set for yahoo finance.
+
+-> We can take the major stocks symbols from yahoo finance. 
+
+-> For this example, I have taken 6 major Indian banks listed on NSE 
+S.No BANK NAME            SYMBOL
+1. SBI Bank   -->         SBIN.NS
+2. HDFC Bank  -->         HDFC.NS  
+3. ICICI Bank -->         ICICIBANK.NS
+4. Axis Bank  -->         AXISBANK.NS
+5. Kotak Mahindra  -->    KOTAKBANK.NS
+6. IndusIND Bank -->      INDUSINDBK.NS
+7. BANK NIFTY    -->      ^NSEBANK
+
+
+------STEP [1] -------
+
+METHOD - FIRST :
+-> Every stock is called individually. This is done to give reader Idea about what is happeninig inside the function. Interval is between 2018-Jan-01 to 2022-May-01 
+```{r}
+sbi<-getSymbols("SBIN.NS",
+                 from='2018-01-01',
+                 to='2022-05-01',
+                 adjust=T,
+                 auto.assign = FALSE)
+hdfc<-getSymbols("HDFC.NS",
+                     from='2018-01-01',
+                     to='2022-05-01',
+                     adjust=T,
+                     auto.assign = FALSE)
+nsebank<-getSymbols("^NSEBANK",
+                     from='2018-01-01',
+                     to='2022-05-01',
+                     adjust=T,
+                     auto.assign = FALSE)
+axisbnk<-getSymbols("AXISBANK.NS",
+                     from='2018-01-01',
+                     to='2022-05-01',
+                     adjust=T,
+                     auto.assign = FALSE)                     
+icici<-getSymbols("ICICIBANK.NS",
+                     from='2018-01-01',
+                     to='2022-05-01',
+                     adjust=T,
+                     auto.assign = FALSE)
+kotak<-getSymbols("KOTAKBANK.NS",
+                     from='2018-01-01',
+                     to='2022-05-01',
+                     adjust=T,
+                     auto.assign = FALSE)
+indus<-getSymbols("INDUSINDBK.NS",
+                     from='2018-01-01',
+                     to='2022-05-01',
+                     adjust=T,
+                     auto.assign = FALSE)
+
+```
+
+METHOD - SECOND :
+-> We can simply list all the ticker name in a list and use lapply function to iterate getSymbol function over each ticker name
+```{r message=FALSE, warning=FALSE}
+
+symbols = c("SBIN.NS","HDFC.NS","AXISBANK.NS", "ICICIBANK.NS", "KOTAKBANK.NS", "INDUSINDBK.NS","^NSEBANK")
+data = lapply(symbols, function(symbol) {
+  getSymbols(symbol, from='2018-01-01', to='2022-05-01', adjust=T ,auto.assign=FALSE)
+})
+lapply(data, tail, n=2)
+```
+
+------STEP [2] -------
+
+COMPUTING RETURNS OF ALL THE STOCKS USING THEIR CLOSE PRICES
+->Let’s compute the returns of each ticker and create one xts object.
+```{r}
+returns = lapply(data, function(x) Cl(x)/Lag(Cl(x), k=1) - 1)
+lapply(returns, tail, n=2)
+```
+
+------STEP [3] -------
+FORMATION OF RETURN MATRIX 
+->We have a 3D Tensor of all the bank stocks returns with their OHLC + Volume and Adj Close Data.
+We will take the Close columns from the data tensor and bind it in a 2D matrix = "Returns"
+
+```{r}
+returns = do.call(cbind, returns)
+returns = returns[-1, ]
+names(returns) = gsub("\\.Close", "", names(returns))
+head(returns, 3)
+```
+
+------STEP [4] -------
+CHARTING PERFORMANCE OF STOCKS RETURNS
+-> Strategy used = Evalute buy-hold strategies for all individual stocks
+We will simple buy at stock at the start and hold it till the end 
+To generate charts, we will be using the PerformanceSummary Function
+
+```{r}
+charts.PerformanceSummary(returns,main = "Performance Summary of Banking Sector Stocks",plot.engine = 'ggplot', wealth.index=TRUE,geometric=FALSE)
+```
+
+------STEP [5] -------
+CHARTING PERFORMANCE OF STOCKS RETURNS
+-> Strategy used = Evalute buy-hold strategies for custom build portfolio having equal weightage to each stock 
+-> Compare the returns of portfolio with BANK NIFTY
+
+-> Formation of Portfolio = "EQUAL_WEIGHT
+```{r}
+returns$Equal_Weight=returns$SBIN.NS*(1/6)+returns$HDFC.NS*(1/6)+returns$AXISBANK.NS*(1/6)+returns$ICICIBANK.NS*(1/6)+returns$KOTAKBANK.NS*(1/6)+returns$INDUSINDBK.NS*(1/6)
+
+```
+
+-> Performance comparison by Visual Chart
+```{r}
+charts.PerformanceSummary(returns[, c("Equal_Weight","NSEBANK")],
+                          wealth.index=TRUE, geometric=FALSE)
+```
+
+-> Performance comparison by Computing Performance statistics 
+```{r}
+table.AnnualizedReturns(returns[,c("Equal_Weight","NSEBANK")])
+```
+
+-> Performance comparison by Computing Performance statistics for a constraint interval
+[NON COVID PERFORMANCE]
+```{r}
+table.AnnualizedReturns(returns["2018/2020", c("Equal_Weight","NSEBANK")])
+
+```
+
+-> Performance comparison by Computing Performance statistics for a constraint interval
+[COVID PERFORMACE]
+```{r}
+table.AnnualizedReturns(returns["2020/2022", c("Equal_Weight","NSEBANK")])
+
+```
+```{r}
+charts.PerformanceSummary(returns["2020/2022", c("Equal_Weight","NSEBANK")],
+                          wealth.index=TRUE, geometric=FALSE)
+```
+
+------STEP [6] -------
+Code Dynamic Display of charts
+```#{r}
+returns=na.omit(returns)
+R_cumulative = 1 + cumsum(returns)
+dygraph(R_cumulative[, c("Equal_Weight","NSEBANK","ICICIBANK.NS")]) %>%
+  dyRangeSelector(dateWindow = c("2018-01-03", "2022-05-01")) %>%
+  dyAxis("y", 
+         valueFormatter = 'function(d){return Math.round(d*100) + "%"}',
+         axisLabelFormatter = 'function(d){return Math.round(d*100) + "%"}')
+
+```
+
+
+
+
+
+
+                     
